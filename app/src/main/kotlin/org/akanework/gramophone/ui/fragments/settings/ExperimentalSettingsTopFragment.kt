@@ -82,11 +82,6 @@ class ExperimentalSettingsTopFragment : BasePreferenceFragment() {
 
     private fun checkAndRequestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (!isAdded) {
-                // Fragment 未附着，推迟操作或记录日志
-                Log.e("Fragment", "Fragment not attached to context yet")
-                return
-            }
             when {
                 ActivityCompat.checkSelfPermission(
                     requireContext(),

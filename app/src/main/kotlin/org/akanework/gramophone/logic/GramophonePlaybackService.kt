@@ -94,7 +94,6 @@ import org.akanework.gramophone.logic.utils.LrcUtils.loadAndParseLyricsFile
 import org.akanework.gramophone.logic.utils.LrcUtils.loadAndParseLyricsFileLegacy
 import org.akanework.gramophone.logic.utils.MediaStoreUtils
 import org.akanework.gramophone.logic.utils.SemanticLyrics
-import org.akanework.gramophone.logic.utils.convertForLegacy
 import org.akanework.gramophone.logic.utils.exoplayer.EndedWorkaroundPlayer
 import org.akanework.gramophone.logic.utils.exoplayer.GramophoneMediaSourceFactory
 import org.akanework.gramophone.logic.utils.exoplayer.GramophoneRenderFactory
@@ -796,8 +795,8 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
 
     fun updateLyrics(parsedLyrics: MutableList<MediaStoreUtils.Lyric>?, parsedLyricsa: SemanticLyrics?) {
         if ( parsedLyrics.toString() == "null" ){
-            lyrics = parsedLyricsa
-            adapter?.updateLyrics(lyrics.convertForLegacy())
+            lyricsLegacy = SemanticLyrics.convertForLegacy(parsedLyricsa)
+            adapter?.updateLyrics(lyricsLegacy)
             newView?.updateLyrics(null)
         } else {
             lyricsLegacy = parsedLyrics
