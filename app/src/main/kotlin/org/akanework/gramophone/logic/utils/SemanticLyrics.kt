@@ -5,9 +5,13 @@ import android.os.Parcelable
 import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
+import org.akanework.gramophone.logic.utils.SemanticLyrics.LyricLine
+import org.akanework.gramophone.logic.utils.SemanticLyrics.LyricLineHolder
+import org.akanework.gramophone.logic.utils.SemanticLyrics.SyncedLyrics
+import org.akanework.gramophone.logic.utils.SemanticLyrics.UnsyncedLyrics
+import org.akanework.gramophone.logic.utils.SemanticLyrics.Word
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.map
-import kotlin.math.min
 
 /*
  * Syntactic-semantic lyric parser.
@@ -27,20 +31,20 @@ import kotlin.math.min
  *      reading of otherwise discarded lyrics, all the lines between sync point A and B are read as
  *      lyric text of A
  *  - Extended LRC (ref Wikipedia) ex: [00:11.22] <00:11.22> hello <00:12.85> i am <00:13.23> lyric
- *  - Wakaloke gender extension (ref Wikipedia)
- *  - Apple Music dual speaker extension (v1: / v2:)
+ *  - Walaoke gender extension (ref Wikipedia)
+ *  - iTunes dual speaker extension (v1: / v2: / [bg: ])
  *  - [offset:] tag in header (ref Wikipedia)
  * We completely ignore all ID3 tags from the header as MediaStore is our source of truth.
  */
 
 @Parcelize
-enum class SpeakerEntity(val isWakaloke: Boolean) : Parcelable {
-	Male(true), // Wakaloke
-	Female(true), // Wakaloke
-	Duet(true), // Wakaloke
-	Background(false), // Apple
-	Voice1(false), // Apple
-	Voice2(false) // Apple
+enum class SpeakerEntity(val isWalaoke: Boolean) : Parcelable {
+	Male(true), // Walaoke
+	Female(true), // Walaoke
+	Duet(true), // Walaoke
+	Background(false), // iTunes
+	Voice1(false), // iTunes
+	Voice2(false) // iTunes
 }
 
 /*
@@ -56,19 +60,19 @@ enum class SpeakerEntity(val isWakaloke: Boolean) : Parcelable {
  *      lyric text of A
  *  - Extended LRC (ref Wikipedia) ex: [00:11.22] <00:11.22> hello <00:12.85> i am <00:13.23> lyric
  *  - Extended LRC without sync points ex: <00:11.22> hello <00:12.85> i am <00:13.23> lyric
- *  - Wakaloke gender extension (ref Wikipedia)
- *  - Apple Music dual speaker extension (v1: / v2: / [bg: ])
+ *  - Walaoke gender extension (ref Wikipedia)
+ *  - iTunes dual speaker extension (v1: / v2: / [bg: ])
  *  - Metadata tags in header (ref Wikipedia)
  */
-private sealed class SyntacticLyrics {
+private sealed class SyntacticLrc {
 	// all timestamps are in milliseconds ignoring offset
-	data class SyncPoint(val timestamp: ULong) : SyntacticLyrics()
-	data class SpeakerTag(val speaker: SpeakerEntity) : SyntacticLyrics()
-	data class WordSyncPoint(val timestamp: ULong) : SyntacticLyrics()
-	data class Metadata(val name: String, val value: String) : SyntacticLyrics()
-	data class LyricText(val text: String) : SyntacticLyrics()
-	data class InvalidText(val text: String) : SyntacticLyrics()
-	open class NewLine() : SyntacticLyrics() {
+	data class SyncPoint(val timestamp: ULong) : SyntacticLrc()
+	data class SpeakerTag(val speaker: SpeakerEntity) : SyntacticLrc()
+	data class WordSyncPoint(val timestamp: ULong) : SyntacticLrc()
+	data class Metadata(val name: String, val value: String) : SyntacticLrc()
+	data class LyricText(val text: String) : SyntacticLrc()
+	data class InvalidText(val text: String) : SyntacticLrc()
+	open class NewLine() : SyntacticLrc() {
 		class SyntheticNewLine : NewLine()
 	}
 
@@ -85,10 +89,10 @@ private sealed class SyntacticLyrics {
 			return minute * 60u * 1000u + milliseconds
 		}
 
-		fun parse(text: String, multiLineEnabled: Boolean): List<SyntacticLyrics>? {
+		fun parseLrc(text: String, multiLineEnabled: Boolean): List<SyntacticLrc>? {
 			if (text.isBlank()) return null
 			var pos = 0
-			val out = mutableListOf<SyntacticLyrics>()
+			val out = mutableListOf<SyntacticLrc>()
 			var isBgSpeaker = false
 			while (pos < text.length) {
 				if (isBgSpeaker) {
@@ -119,9 +123,9 @@ private sealed class SyntacticLyrics {
 				}
 				val tmMatch = timeMarksRegex.matchAt(text, pos)
 				if (tmMatch != null) {
-					// Insert synthetic newlines at places where we'd expect one. This won't work
-					// well with word lyrics without timestamps at all for obvious reasons, but hey,
-					// we tried. Can't do much about it.
+					// Insert synthetic newlines at places where we'd expect one. This won't ever
+					// work with word lyrics without normal sync points at all for obvious reasons,
+					// but hey, we tried. Can't do much about it.
 					// If you want to write something that looks like a timestamp into your lyrics,
 					// you'll probably have to delete the following three lines.
 					if (!(out.isNotEmpty() && out.last() is NewLine
@@ -186,13 +190,19 @@ private sealed class SyntacticLyrics {
 				}
 				// Metadata (or the bg speaker, which looks like metadata) can only appear in the
 				// beginning of a file or after newlines
+				if (pos + 3 < text.length && text.regionMatches(pos, "[bg:", 0, 4)) {
+					// Insert synthetic newlines at places where we'd expect one.
+					// If you want to write [bg: into your lyrics, you'll probably have to add the
+					// conditional surrounding this comment into the
+					// if (out.isEmpty() || out.last() is NewLine) below.
+					if (!out.isEmpty() && out.last() !is NewLine)
+						out.add(NewLine.SyntheticNewLine())
+					out.add(SpeakerTag(SpeakerEntity.Background))
+					pos += 4
+					isBgSpeaker = true
+					continue
+				}
 				if (out.isEmpty() || out.last() is NewLine) {
-					if (pos + 4 < text.length && text.regionMatches(pos, "[bg: ", 0, 5)) {
-						out.add(SpeakerTag(SpeakerEntity.Background))
-						pos += 5
-						isBgSpeaker = true
-						continue
-					}
 					val mmMatch = metadataRegex.matchAt(text, pos)
 					if (mmMatch != null) {
 						out.add(Metadata(mmMatch.groupValues[1], mmMatch.groupValues[2]))
@@ -282,7 +292,7 @@ private sealed class SyntacticLyrics {
 									aaa = aaa.dropLast(1)
 								}
 								listOf(LyricText(aaa)).let {
-									var aaaa: List<SyntacticLyrics> = it
+									var aaaa: List<SyntacticLrc> = it
 									while (i-- > 0)
 										aaaa = aaaa + listOf(NewLine())
 									aaaa
@@ -316,8 +326,8 @@ private sealed class SyntacticLyrics {
  *  - Translations, type 2 (ex: translated line directly under previous non-translated line)
  *  - Extended LRC (ref Wikipedia) ex: [00:11.22] <00:11.22> hello <00:12.85> i am <00:13.23> lyric
  *  - Extended LRC without sync points ex: <00:11.22> hello <00:12.85> i am <00:13.23> lyric
- *  - Wakaloke gender extension (ref Wikipedia)
- *  - Apple Music dual speaker extension (v1: / v2: / [bg: ])
+ *  - Walaoke gender extension (ref Wikipedia)
+ *  - iTunes dual speaker extension (v1: / v2: / [bg: ])
  *  - [offset:] tag in header (ref Wikipedia)
  * We completely ignore all ID3 tags from the header as MediaStore is our source of truth.
  */
@@ -356,157 +366,166 @@ sealed class SemanticLyrics : Parcelable {
 			parcel.writeInt(last)
 		}
 	}
-	companion object {
-		fun parse(lyricText: String, trimEnabled: Boolean, multiLineEnabled: Boolean): SemanticLyrics? {
-			val lyricSyntax = SyntacticLyrics.parse(lyricText, multiLineEnabled)
-				?: return null
-			if (lyricSyntax.find { it !is SyntacticLyrics.InvalidText } == null)
-				return UnsyncedLyrics(lyricSyntax.map { (it as SyntacticLyrics.InvalidText).text })
-			// Synced lyrics processing state machine starts here
-			val out = mutableListOf<LyricLine>()
-			var offset = 0L
-			var lastSyncPoint: ULong? = null
-			var lastWordSyncPoint: ULong? = null
-			var speaker: SpeakerEntity? = null
-			var hadLyricSinceWordSync = true
-			var currentLine = mutableListOf<Pair<ULong, String?>>()
-			var syncPointStreak = 0
-			var compressed = mutableListOf<ULong>()
-			for (element in lyricSyntax) {
-				if (element is SyntacticLyrics.SyncPoint)
-					syncPointStreak++
-				else
-					syncPointStreak = 0
-				when {
-					element is SyntacticLyrics.Metadata && element.name == "offset" -> {
-						// positive offset means lyric played earlier in lrc, hence multiply with -1
-						offset = element.value.toLong() * -1
-					}
-					element is SyntacticLyrics.SyncPoint -> {
-						val ts = (element.timestamp.toLong() + offset).coerceAtLeast(0).toULong()
-						if (syncPointStreak > 1) {
-							compressed.add(ts)
-						} else {
-							// if there's something in compressed at this point, would it be a bug?
-							compressed.clear()
-							lastSyncPoint = ts
-						}
-					}
-					element is SyntacticLyrics.SpeakerTag -> {
-						speaker = element.speaker
-					}
-					element is SyntacticLyrics.WordSyncPoint -> {
-						if (!hadLyricSinceWordSync && lastWordSyncPoint != null)
-							// add a dummy word for preserving end timing of previous word
-							currentLine.add(Pair(lastWordSyncPoint, null))
-						lastWordSyncPoint = (element.timestamp.toLong() + offset).coerceAtLeast(0).toULong()
-						if (lastSyncPoint == null)
-							lastSyncPoint = lastWordSyncPoint
-						hadLyricSinceWordSync = false
-					}
-					element is SyntacticLyrics.LyricText -> {
-						hadLyricSinceWordSync = true
-						currentLine.add(Pair(lastWordSyncPoint ?: lastSyncPoint!!, element.text))
-					}
-					element is SyntacticLyrics.NewLine -> {
-						var words = if (currentLine.size > 1) {
-							val wout = mutableListOf<Word>()
-							var idx = 0
-							for (i in currentLine.indices) {
-								val current = currentLine[i]
-								if (current.second == null)
-									continue // skip dummy words that only exist to provide time
-								val oIdx = idx
-								idx += current.second?.length ?: 0
-								val endInclusive = if (i + 1 < currentLine.size) {
-									// If we have a next word (with sync point), use its sync
-									// point minus 1ms as end point of this word
-									currentLine[i + 1].first - 1uL
-								} else if (lastWordSyncPoint != null &&
-									lastWordSyncPoint > current.first) {
-									// If we have a dedicated sync point just for the last word,
-									// use it. Similar to dummy words but for the last word only
-									lastWordSyncPoint
-								} else {
-									// Estimate how long this word will take based on character
-									// to time ratio. To avoid this estimation, add a last word
-									// sync point to the line after the text :)
-									current.first + (wout.map { it.timeRange.count() /
-											it.charRange.count().toFloat() }.average() *
-											(current.second?.length ?: 0)).toULong()
-								}
-								if (endInclusive > current.first)
-									wout.add(Word(current.first..endInclusive, oIdx..<idx))
-							}
-							wout
-						} else null
-						if (currentLine.isNotEmpty() || lastWordSyncPoint != null || lastSyncPoint != null) {
-							var text = currentLine.joinToString("") { it.second ?: "" }
-							if (trimEnabled) {
-								val orig = text
-								text = orig.trimStart()
-								val startDiff = orig.length - text.length
-								text = text.trimEnd()
-								words = words?.flatMap {
-									if (it.charRange.last.toLong() - startDiff < 0
-										|| it.charRange.first.toLong() - startDiff >= text.length)
-										listOf()
-									else
-										listOf(it.copy(charRange = (it.charRange.first - startDiff)
-											.coerceAtLeast(0)..(it.charRange.last - startDiff)
-											.coerceAtMost(text.length - 1)))
-								}?.toMutableList()
-							}
-							val start = if (currentLine.isNotEmpty()) currentLine.first().first
-							else lastWordSyncPoint ?: lastSyncPoint!!
-							out.add(LyricLine(text, start, words, speaker))
-							compressed.forEach {
-								val diff = it - start
-								out.add(out.last().copy(start = it, words = words?.map { it.copy(
-									it.timeRange.start + diff..it.timeRange.last + diff) }))
-							}
-						}
-						compressed.clear()
-						currentLine.clear()
-						lastSyncPoint = null
-						lastWordSyncPoint = null
-						// Wakaloke extension speakers stick around unless another speaker is
-						// specified. (The default speaker - before one is chosen - is male.)
-						if (speaker?.isWakaloke != true)
-							speaker = null
-						hadLyricSinceWordSync = true
-					}
-				}
-			}
-			out.sortBy { it.start }
-			var sawNonBlank = false
-			var previousTimestamp = 0uL
-			val defaultIsWakalokeM = out.find { it.speaker?.isWakaloke == true } != null &&
-				out.find { it.speaker?.isWakaloke == false } == null
-			return SyncedLyrics(out.flatMap {
-				if (sawNonBlank || it.text.isNotBlank()) {
-					sawNonBlank = true
-					listOf(it)
-				} else listOf()
-			}.map {
-				if (defaultIsWakalokeM && it.speaker == null)
-					it.copy(speaker = SpeakerEntity.Male)
-				else it
-			}.map {
-				LyricLineHolder(it, it.start == previousTimestamp).also {
-					previousTimestamp = it.lyric.start
-				}
-			})
-		}
+}
 
-		fun convertForLegacy(lyric: SemanticLyrics?): MutableList<MediaStoreUtils.Lyric>? {
-			if (lyric == null) return null
-			if (lyric is SyncedLyrics) {
-				return lyric.text.map {
-					MediaStoreUtils.Lyric(it.lyric.start.toLong(), it.lyric.text, it.isTranslated)
-				}.toMutableList()
+fun parseLrc(lyricText: String, trimEnabled: Boolean, multiLineEnabled: Boolean): SemanticLyrics? {
+	val lyricSyntax = SyntacticLrc.parseLrc(lyricText, multiLineEnabled)
+		?: return null
+	if (lyricSyntax.find { it !is SyntacticLrc.InvalidText } == null)
+		return UnsyncedLyrics(lyricSyntax.map { (it as SyntacticLrc.InvalidText).text })
+	// Synced lyrics processing state machine starts here
+	val out = mutableListOf<LyricLine>()
+	var offset = 0L
+	var lastSyncPoint: ULong? = null
+	var lastWordSyncPoint: ULong? = null
+	var speaker: SpeakerEntity? = null
+	var hadLyricSinceWordSync = true
+	var currentLine = mutableListOf<Pair<ULong, String?>>()
+	var syncPointStreak = 0
+	var compressed = mutableListOf<ULong>()
+	for (element in lyricSyntax) {
+		if (element is SyntacticLrc.SyncPoint)
+			syncPointStreak++
+		else
+			syncPointStreak = 0
+		when {
+			element is SyntacticLrc.Metadata && element.name == "offset" -> {
+				// positive offset means lyric played earlier in lrc, hence multiply with -1
+				offset = element.value.toLong() * -1
 			}
-			return mutableListOf(MediaStoreUtils.Lyric(null, lyric.unsyncedText.joinToString("\n"), false))
+			element is SyntacticLrc.SyncPoint -> {
+				val ts = (element.timestamp.toLong() + offset).coerceAtLeast(0).toULong()
+				if (syncPointStreak > 1) {
+					compressed.add(ts)
+				} else {
+					// if there's something in compressed at this point, would it be a bug?
+					compressed.clear()
+					lastSyncPoint = ts
+				}
+			}
+			element is SyntacticLrc.SpeakerTag -> {
+				speaker = element.speaker
+			}
+			element is SyntacticLrc.WordSyncPoint -> {
+				if (!hadLyricSinceWordSync && lastWordSyncPoint != null)
+				// add a dummy word for preserving end timing of previous word
+					currentLine.add(Pair(lastWordSyncPoint, null))
+				lastWordSyncPoint = (element.timestamp.toLong() + offset).coerceAtLeast(0).toULong()
+				if (lastSyncPoint == null)
+					lastSyncPoint = lastWordSyncPoint
+				hadLyricSinceWordSync = false
+			}
+			element is SyntacticLrc.LyricText -> {
+				hadLyricSinceWordSync = true
+				currentLine.add(Pair(lastWordSyncPoint ?: lastSyncPoint!!, element.text))
+			}
+			element is SyntacticLrc.NewLine -> {
+				var words = if (currentLine.size > 1) {
+					val wout = mutableListOf<Word>()
+					var idx = 0
+					for (i in currentLine.indices) {
+						val current = currentLine[i]
+						if (current.second == null)
+							continue // skip dummy words that only exist to provide time
+						val oIdx = idx
+						idx += current.second?.length ?: 0
+						val endInclusive = if (i + 1 < currentLine.size) {
+							// If we have a next word (with sync point), use its sync
+							// point minus 1ms as end point of this word
+							currentLine[i + 1].first - 1uL
+						} else if (lastWordSyncPoint != null &&
+							lastWordSyncPoint > current.first) {
+							// If we have a dedicated sync point just for the last word,
+							// use it. Similar to dummy words but for the last word only
+							lastWordSyncPoint
+						} else {
+							// Estimate how long this word will take based on character
+							// to time ratio. To avoid this estimation, add a last word
+							// sync point to the line after the text :)
+							current.first + (wout.map { it.timeRange.count() /
+									it.charRange.count().toFloat() }.average() *
+									(current.second?.length ?: 0)).toULong()
+						}
+						if (endInclusive > current.first)
+							wout.add(Word(current.first..endInclusive, oIdx..<idx))
+					}
+					wout
+				} else null
+				if (currentLine.isNotEmpty() || lastWordSyncPoint != null || lastSyncPoint != null) {
+					var text = currentLine.joinToString("") { it.second ?: "" }
+					if (trimEnabled) {
+						val orig = text
+						text = orig.trimStart()
+						val startDiff = orig.length - text.length
+						text = text.trimEnd()
+						words = words?.flatMap {
+							if (it.charRange.last.toLong() - startDiff < 0
+								|| it.charRange.first.toLong() - startDiff >= text.length)
+								listOf()
+							else
+								listOf(it.copy(charRange = (it.charRange.first - startDiff)
+									.coerceAtLeast(0)..(it.charRange.last - startDiff)
+									.coerceAtMost(text.length - 1)))
+						}?.toMutableList()
+					}
+					val start = if (currentLine.isNotEmpty()) currentLine.first().first
+					else lastWordSyncPoint ?: lastSyncPoint!!
+					out.add(LyricLine(text, start, words, speaker))
+					compressed.forEach {
+						val diff = it - start
+						out.add(out.last().copy(start = it, words = words?.map { it.copy(
+							it.timeRange.start + diff..it.timeRange.last + diff) }))
+					}
+				}
+				compressed.clear()
+				currentLine.clear()
+				lastSyncPoint = null
+				lastWordSyncPoint = null
+				// Walaoke extension speakers stick around unless another speaker is
+				// specified. (The default speaker - before one is chosen - is male.)
+				if (speaker?.isWalaoke != true)
+					speaker = null
+				hadLyricSinceWordSync = true
+			}
 		}
 	}
+	out.sortBy { it.start }
+	var sawNonBlank = false
+	var previousTimestamp = 0uL
+	val defaultIsWalaokeM = out.find { it.speaker?.isWalaoke == true } != null &&
+			out.find { it.speaker?.isWalaoke == false } == null
+	return SyncedLyrics(out.flatMap {
+		if (sawNonBlank || it.text.isNotBlank()) {
+			sawNonBlank = true
+			listOf(it)
+		} else listOf()
+	}.map {
+		if (defaultIsWalaokeM && it.speaker == null)
+			it.copy(speaker = SpeakerEntity.Male)
+		else it
+	}.map {
+		LyricLineHolder(it, it.start == previousTimestamp).also {
+			previousTimestamp = it.lyric.start
+		}
+	})
+}
+
+fun parseTtml(lyricText: String, trimEnabled: Boolean): SemanticLyrics? {
+	// TODO TTML support (and add unit tests for it)
+	return null
+}
+
+fun parseSrt(lyricText: String, trimEnabled: Boolean): SemanticLyrics? {
+	// TODO SRT support (and add unit tests for it)
+	return null
+}
+
+fun SemanticLyrics?.convertForLegacy(): MutableList<MediaStoreUtils.Lyric>? {
+	if (this == null) return null
+	if (this is SyncedLyrics) {
+		return this.text.map {
+			MediaStoreUtils.Lyric(it.lyric.start.toLong(), it.lyric.text, it.isTranslated)
+		}.toMutableList()
+	}
+	return mutableListOf(MediaStoreUtils.Lyric(null, this.unsyncedText.joinToString("\n"), false))
 }

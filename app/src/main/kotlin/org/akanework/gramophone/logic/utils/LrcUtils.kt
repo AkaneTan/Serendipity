@@ -18,29 +18,63 @@ object LrcUtils {
 
     data class LrcParserOptions(val trim: Boolean, val multiLine: Boolean, val errorText: String)
 
+    @VisibleForTesting
+    fun parseLyrics(lyrics: String, parserOptions: LrcParserOptions): SemanticLyrics? {
+         return try {
+             parseTtml(lyrics, parserOptions.trim)
+         } catch (e: Exception) {
+             Log.e(TAG, Log.getStackTraceString(e))
+             SemanticLyrics.UnsyncedLyrics(listOf(parserOptions.errorText))
+        } ?: try {
+             parseSrt(lyrics, parserOptions.trim)
+         } catch (e: Exception) {
+             Log.e(TAG, Log.getStackTraceString(e))
+             SemanticLyrics.UnsyncedLyrics(listOf(parserOptions.errorText))
+         } ?: try {
+            parseLrc(lyrics, parserOptions.trim, parserOptions.multiLine)
+        } catch (e: Exception) {
+            Log.e(TAG, Log.getStackTraceString(e))
+            SemanticLyrics.UnsyncedLyrics(listOf(parserOptions.errorText))
+        }
+    }
+
     @OptIn(UnstableApi::class)
     fun extractAndParseLyrics(metadata: Metadata, parserOptions: LrcParserOptions): SemanticLyrics? {
         for (i in 0..<metadata.length()) {
             val meta = metadata.get(i)
-            val data =
+            // TODO https://id3.org/id3v2.4.0-frames implement SYLT
+            // if (meta is BinaryFrame && meta.id == "SYLT") {
+            //    val syltData = SyltFrameDecoder.decode(ParsableByteArray(meta.data))
+            //    if (syltData != null) return syltData
+            // }
+            val plainTextData =
                 if (meta is VorbisComment && meta.key == "LYRICS") // ogg / flac
                     meta.value
-                else if (meta is BinaryFrame && (meta.id == "USLT" || meta.id == "SYLT")) // mp3 / other id3 based
+                else if (meta is BinaryFrame && meta.id == "USLT") // mp3 / other id3 based
                     UsltFrameDecoder.decode(ParsableByteArray(meta.data))
-                else if (meta is TextInformationFrame && (meta.id == "USLT" || meta.id == "SYLT")) // m4a
+                else if (meta is TextInformationFrame && meta.id == "USLT") // m4a
                     meta.values.joinToString("\n")
                 else null
-            val lyrics = data?.let {
-                try {
-                    SemanticLyrics.parse(it, parserOptions.trim, parserOptions.multiLine)
-                } catch (e: Exception) {
-                    Log.e(TAG, Log.getStackTraceString(e))
-                    SemanticLyrics.UnsyncedLyrics(listOf(parserOptions.errorText))
-                }
-            }
-            return lyrics ?: continue
+            return plainTextData?.let { parseLyrics(it, parserOptions) } ?: continue
         }
         return null
+    }
+
+    @OptIn(UnstableApi::class)
+    fun loadAndParseLyricsFile(musicFile: File?, parserOptions: LrcParserOptions): SemanticLyrics? {
+        val lrcFile = musicFile?.let { File(it.parentFile, it.nameWithoutExtension + ".lrc") }
+        return loadTextFile(lrcFile, parserOptions.errorText)?.let { parseLyrics(it, parserOptions) }
+    }
+
+    private fun loadTextFile(lrcFile: File?, errorText: String?): String? {
+        return try {
+            if (lrcFile?.exists() == true)
+                lrcFile.readBytes().toString(Charset.defaultCharset())
+            else null
+        } catch (e: Exception) {
+            Log.e(TAG, Log.getStackTraceString(e))
+            return errorText
+        }
     }
 
     @OptIn(UnstableApi::class)
@@ -69,22 +103,9 @@ object LrcUtils {
     }
 
     @OptIn(UnstableApi::class)
-    fun loadAndParseLyricsFile(musicFile: File?, parserOptions: LrcParserOptions): SemanticLyrics? {
-        val lrcFile = musicFile?.let { File(it.parentFile, it.nameWithoutExtension + ".lrc") }
-        return loadLrcFile(lrcFile)?.let {
-            try {
-                SemanticLyrics.parse(it, parserOptions.trim, parserOptions.multiLine)
-            } catch (e: Exception) {
-                Log.e(TAG, Log.getStackTraceString(e))
-                SemanticLyrics.UnsyncedLyrics(listOf(parserOptions.errorText))
-            }
-        }
-    }
-
-    @OptIn(UnstableApi::class)
     fun loadAndParseLyricsFileLegacy(musicFile: File?, parserOptions: LrcParserOptions): MutableList<MediaStoreUtils.Lyric>? {
         val lrcFile = musicFile?.let { File(it.parentFile, it.nameWithoutExtension + ".lrc") }
-        return loadLrcFile(lrcFile)?.let {
+        return loadTextFile(lrcFile, parserOptions.errorText)?.let {
             try {
                 parseLrcStringLegacy(it, parserOptions)
             } catch (e: Exception) {
@@ -93,19 +114,7 @@ object LrcUtils {
             } }
     }
 
-    private fun loadLrcFile(lrcFile: File?): String? {
-        return try {
-            if (lrcFile?.exists() == true)
-                lrcFile.readBytes().toString(Charset.defaultCharset())
-            else null
-        } catch (e: Exception) {
-            Log.e(TAG, e.message ?: Log.getStackTraceString(e))
-            null
-        }
-    }
-
-    @VisibleForTesting
-    fun parseLrcStringLegacy(
+    private fun parseLrcStringLegacy(
         lrcContent: String,
         parserOptions: LrcParserOptions
     ): MutableList<MediaStoreUtils.Lyric>? {

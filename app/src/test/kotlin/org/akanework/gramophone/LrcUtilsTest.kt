@@ -1,5 +1,6 @@
 package org.akanework.gramophone
 
+import org.akanework.gramophone.logic.utils.LrcUtils
 import org.akanework.gramophone.logic.utils.SemanticLyrics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,7 +33,7 @@ class LrcUtilsTest {
 				assertEquals("multiline true and false should result in same list for this string (trim=$trim)", b?.unsyncedText, a?.unsyncedText)
 			return a
 		}
-		val a = SemanticLyrics.parse(lrcContent, trim, multiline)
+		val a = LrcUtils.parseLyrics(lrcContent, LrcUtils.LrcParserOptions(trim, multiline, "--no lyric found--"))
 		if (mustSkip != null) {
 			if (mustSkip) {
 				assertTrue("excepted skip (trim=$trim multiline=$multiline)", a is SemanticLyrics.UnsyncedLyrics)
@@ -241,10 +242,10 @@ class LrcUtilsTest {
 	}
 
 	@Test
-	fun testTemplateLrcWakaloke() {
-		val lrc = parseSynced(LrcTestData.WAKALOKE_TEST)
+	fun testTemplateLrcWalaoke() {
+		val lrc = parseSynced(LrcTestData.WALAOKE_TEST, trim = true)
 		assertNotNull(lrc)
-		assertEquals(LrcTestData.WAKALOKE_TEST_PARSED, lrc)
+		assertEquals(LrcTestData.WALAOKE_TEST_PARSED, lrc)
 	}
 
 	@Test
@@ -261,7 +262,7 @@ class LrcUtilsTest {
 		assertEquals(200uL, lrc[0].lyric.words!![1].timeRange.start)
 		assertEquals(1000uL - 1uL, lrc[0].lyric.words!![1].timeRange.last)
 		assertEquals(1000uL, lrc[0].lyric.words!![2].timeRange.start)
-		println(lrc[0].lyric.words!![2].timeRange.last) // TODO test this is sane
+		assertEquals(1270uL, lrc[0].lyric.words!![2].timeRange.last)
 		assertEquals(10100uL, lrc[1].lyric.start)
 		assertNotNull(lrc[1].lyric.words)
 		assertEquals(3, lrc[1].lyric.words!!.size)
@@ -270,7 +271,7 @@ class LrcUtilsTest {
 		assertEquals(10200uL, lrc[1].lyric.words!![1].timeRange.start)
 		assertEquals(11000uL - 1uL, lrc[1].lyric.words!![1].timeRange.last)
 		assertEquals(11000uL, lrc[1].lyric.words!![2].timeRange.start)
-		println(lrc[1].lyric.words!![2].timeRange.last) // TODO test this is sane
+		assertEquals(11270uL, lrc[1].lyric.words!![2].timeRange.last)
 	}
 
 	@Test

@@ -58,7 +58,7 @@ class StaticLayoutBuilderCompat private constructor(
 	private var lineSpacingMultiplier: Float
 	private var hyphenationFrequency: Int
 	private var includePad: Boolean
-	private var isRtl = false
+	private var isRtl: Boolean? = null
 	private var ellipsize: TextUtils.TruncateAt?
 
 	// @Nullable private StaticLayoutBuilderConfigurer staticLayoutBuilderConfigurer;
@@ -197,8 +197,14 @@ class StaticLayoutBuilderCompat private constructor(
 		}
 
 		end = min(textToDraw!!.length, end)
+		val textDirectionHeuristic = if (isRtl == true)
+			TextDirectionHeuristics.RTL
+		else if (isRtl == false)
+			TextDirectionHeuristics.LTR
+		else
+			TextDirectionHeuristics.FIRSTSTRONG_LTR
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			if (isRtl && maxLines == 1) {
+			if (isRtl == true && maxLines == 1) {
 				alignment = Layout.Alignment.ALIGN_OPPOSITE
 			}
 			// Marshmallow introduced StaticLayout.Builder which allows us not to use
@@ -209,10 +215,6 @@ class StaticLayoutBuilderCompat private constructor(
 				)
 			builder.setAlignment(alignment)
 			builder.setIncludePad(includePad)
-			val textDirectionHeuristic = if (isRtl)
-				TextDirectionHeuristics.RTL
-			else
-				TextDirectionHeuristics.LTR
 			builder.setTextDirection(textDirectionHeuristic)
 			if (ellipsize != null) {
 				builder.setEllipsize(ellipsize)
@@ -226,6 +228,15 @@ class StaticLayoutBuilderCompat private constructor(
 			if (maxLines > 1) {
 				builder.setHyphenationFrequency(hyphenationFrequency)
 			}
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+				builder.setUseLineSpacingFromFallbacks(true)
+			}
+			// TODO uncomment when targetSdk 35
+			// if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+			// 	    builder.setUseBoundsForWidth(true)
+			// 	    builder.setShiftDrawingOffsetForStartOverhang(true)
+			// }
+
 			//if (staticLayoutBuilderConfigurer != null) {
 			//	staticLayoutBuilderConfigurer.configure(builder);
 			//}
@@ -243,7 +254,7 @@ class StaticLayoutBuilderCompat private constructor(
 				paint,
 				availableWidth,
 				alignment,
-				textDirection,
+				textDirectionHeuristic,
 				1.0f,
 				0.0f,
 				includePad,
@@ -282,11 +293,6 @@ class StaticLayoutBuilderCompat private constructor(
 		}
 
 		try {
-			val textDirClass: Class<*>
-			val useRtl = isRtl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-			textDirClass = TextDirectionHeuristic::class.java
-			textDirection = if (useRtl) TextDirectionHeuristics.RTL else TextDirectionHeuristics.LTR
-
 			val signature: Array<Class<*>?> =
 				arrayOf(
 					CharSequence::class.java,
@@ -295,7 +301,7 @@ class StaticLayoutBuilderCompat private constructor(
 					TextPaint::class.java,
 					Int::class.javaPrimitiveType,
 					Layout.Alignment::class.java,
-					textDirClass,
+					TextDirectionHeuristic::class.java,
 					Float::class.javaPrimitiveType,
 					Float::class.javaPrimitiveType,
 					Boolean::class.javaPrimitiveType,
@@ -312,7 +318,7 @@ class StaticLayoutBuilderCompat private constructor(
 		}
 	}
 
-	fun setIsRtl(isRtl: Boolean): StaticLayoutBuilderCompat {
+	fun setIsRtl(isRtl: Boolean?): StaticLayoutBuilderCompat {
 		this.isRtl = isRtl
 		return this
 	}
@@ -334,7 +340,6 @@ class StaticLayoutBuilderCompat private constructor(
 		private var initialized = false
 
 		private var constructor: Constructor<StaticLayout?>? = null
-		private var textDirection: Any? = null
 
 		/**
 		 * Obtain a builder for constructing StaticLayout objects.

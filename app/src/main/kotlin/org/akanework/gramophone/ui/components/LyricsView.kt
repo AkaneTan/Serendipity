@@ -10,6 +10,7 @@ import org.akanework.gramophone.logic.getBooleanStrict
 import org.akanework.gramophone.logic.ui.MyRecyclerView
 import org.akanework.gramophone.logic.utils.MediaStoreUtils
 import org.akanework.gramophone.logic.utils.SemanticLyrics
+import org.akanework.gramophone.logic.utils.convertForLegacy
 
 class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, attrs),
 	SharedPreferences.OnSharedPreferenceChangeListener {
@@ -22,6 +23,12 @@ class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, 
 		get() = recyclerView?.adapter as LegacyLyricsAdapter?
 	private var defaultTextColor = 0
 	private var highlightTextColor = 0
+	private var defaultTextColorM = 0
+	private var highlightTextColorM = 0
+	private var defaultTextColorF = 0
+	private var highlightTextColorF = 0
+	private var defaultTextColorD = 0
+	private var highlightTextColorD = 0
 	private var lyrics: SemanticLyrics? = null
 	private var lyricsLegacy: MutableList<MediaStoreUtils.Lyric>? = null
 
@@ -36,7 +43,9 @@ class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, 
 		if (prefs.getBooleanStrict("lyric_ui", false)) {
 			inflate(context, R.layout.lyric_view_v2, this)
 			newView = findViewById(R.id.lyric_view)
-			newView?.updateTextColor(defaultTextColor, highlightTextColor)
+			newView?.updateTextColor(defaultTextColor, highlightTextColor, defaultTextColorM,
+				highlightTextColorM, defaultTextColorF, highlightTextColorF, defaultTextColorD,
+				highlightTextColorD)
 			newView?.updateLyrics(lyrics)
 		} else {
 			inflate(context, R.layout.lyric_view, this)
@@ -46,7 +55,7 @@ class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, 
 			}
 			recyclerView!!.addItemDecoration(LyricPaddingDecoration(context))
 			if (lyrics != null)
-				adapter?.updateLyrics(SemanticLyrics.convertForLegacy(lyrics))
+				adapter?.updateLyrics(lyrics.convertForLegacy())
 			else
 				adapter?.updateLyrics(lyricsLegacy)
 		}
@@ -80,7 +89,7 @@ class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, 
 	fun updateLyrics(parsedLyrics: SemanticLyrics?) {
 		lyrics = parsedLyrics
 		lyricsLegacy = null
-		adapter?.updateLyrics(SemanticLyrics.convertForLegacy(lyrics))
+		adapter?.updateLyrics(lyrics.convertForLegacy())
 		newView?.updateLyrics(lyrics)
 	}
 
@@ -91,10 +100,20 @@ class LyricsView(context: Context, attrs: AttributeSet?) : FrameLayout(context, 
 		newView?.updateLyrics(null)
 	}
 
-	fun updateTextColor(newColor: Int, newHighlightColor: Int) {
+	fun updateTextColor(newColor: Int, newHighlightColor: Int, newColorM: Int,
+	                    newHighlightColorM: Int, newColorF: Int, newHighlightColorF: Int,
+	                    newColorD: Int, newHighlightColorD: Int) {
 		defaultTextColor = newColor
 		highlightTextColor = newHighlightColor
+		defaultTextColorM = newColorM
+		highlightTextColorM = newHighlightColorM
+		defaultTextColorF = newColorF
+		highlightTextColorF = newHighlightColorF
+		defaultTextColorD = newColorD
+		highlightTextColorD = newHighlightColorD
 		adapter?.updateTextColor(defaultTextColor, highlightTextColor)
-		newView?.updateTextColor(defaultTextColor, highlightTextColor)
+		newView?.updateTextColor(defaultTextColor, highlightTextColor, defaultTextColorM,
+			highlightTextColorM, defaultTextColorF, highlightTextColorF, defaultTextColorD,
+			highlightTextColorD)
 	}
 }

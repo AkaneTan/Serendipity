@@ -397,14 +397,13 @@
 			app:iconTint="?attr/colorOnSurface" />
 	</LinearLayout>
 
-	<org.akanework.gramophone.logic.ui.MyRecyclerView
+	<org.akanework.gramophone.ui.components.LyricsView
 		android:id="@+id/lyric_frame"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
 		android:background="?attr/colorSurface"
 		android:clipToPadding="false"
 		android:clipChildren="false"
-		android:scrollbars="none"
 		android:visibility="gone"
 		android:keepScreenOn="true"
 		tools:listitem="@layout/lyrics" />

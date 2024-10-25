@@ -13,10 +13,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 // Hacks, hacks, hacks...
-class MyGradientSpan(val grdWidth: Int, color: Int, highlightColor: Int) : CharacterStyle(), UpdateAppearance {
+class MyGradientSpan(val grdWidth: Float, color: Int, highlightColor: Int) : CharacterStyle(), UpdateAppearance {
 	private val matrix = Matrix()
 	private var shader = LinearGradient(
-		0f, 50f, grdWidth.toFloat(), 50f,
+		0f, 50f, grdWidth, 50f,
 		highlightColor, color,
 		Shader.TileMode.CLAMP
 	)

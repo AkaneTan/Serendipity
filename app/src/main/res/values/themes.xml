@@ -4,7 +4,7 @@
         <!-- fixes some UI issues on MIUI devices -->
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <!-- true edge-to-edge, no black bars in display notch -->
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="r">always</item>
         <!-- Work around b/331383944: PreferenceFragmentCompat permanently mutates activity theme (enables vertical scrollbars) -->
         <item name="android:scrollbars">none</item>
         <item name="viewInflaterClass">org.akanework.gramophone.logic.ui.ViewCompatInflater</item>
@@ -17,6 +17,7 @@
     </style>
 
     <style name="PreV31.Theme.Gramophone" parent="Base.Theme.Gramophone">
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
         <!-- Material theme -->
         <item name="colorPrimary">@color/md_theme_primary</item>
         <item name="colorOnPrimary">@color/md_theme_onPrimary</item>

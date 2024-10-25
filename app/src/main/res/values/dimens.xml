@@ -19,6 +19,7 @@
     <dimen name="grid_card_padding_bottom">0dp</dimen>
     <dimen name="lyric_top_padding">36dp</dimen>
     <dimen name="lyric_bottom_padding">640dp</dimen>
+    <dimen name="lyric_gradient_size">20dp</dimen>
     <dimen name="lyric_text_size">34.25sp</dimen>
     <dimen name="lyric_tl_text_size">20sp</dimen>
     <dimen name="lyric_tl_bg_text_size">14sp</dimen>

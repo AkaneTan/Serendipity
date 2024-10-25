@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.text.format.DateFormat
@@ -791,9 +792,16 @@ class FullBottomSheet
 			bottomSheetFullCoverFrame.setCardBackgroundColor(
 				colorSurface
 			)
+			// TODO test/tweak walaoke colors
 			bottomSheetFullLyricView.updateTextColor(
 				androidx.core.graphics.ColorUtils.setAlphaComponent(colorPrimary, 77),
-				colorPrimary
+				colorPrimary,
+				androidx.core.graphics.ColorUtils.setAlphaComponent(Color.BLUE, 77),
+				Color.BLUE,
+				androidx.core.graphics.ColorUtils.setAlphaComponent(Color.RED, 77),
+				Color.RED,
+				androidx.core.graphics.ColorUtils.setAlphaComponent(Color.MAGENTA, 77),
+				Color.MAGENTA
 			)
 
 			bottomSheetTimerButton.iconTint =
