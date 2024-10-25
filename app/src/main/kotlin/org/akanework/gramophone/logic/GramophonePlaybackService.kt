@@ -70,7 +70,6 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import androidx.preference.PreferenceManager
-import cn.xiaowine.xkt.AcTool.context
 import coil3.BitmapImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -102,9 +101,6 @@ import org.akanework.gramophone.ui.MainActivity
 import org.akanework.gramophone.ui.components.LegacyLyricsAdapter
 import org.akanework.gramophone.ui.components.NewLyricsView
 import kotlin.random.Random
-import cn.lyric.getter.api.API
-import cn.lyric.getter.api.data.ExtraData
-import cn.lyric.getter.api.tools.Tools
 
 
 /**
@@ -153,9 +149,6 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     private val lyricsLock = Semaphore(1)
     private lateinit var prefs: SharedPreferences
     private var highLyric : String = ""
-    private val notificationManager: NotificationManager by lazy {
-        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    }
 
     private fun getRepeatCommand() =
         when (controller!!.repeatMode) {
@@ -201,7 +194,6 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     override fun onCreate() {
         handler = Handler(Looper.getMainLooper())
         super.onCreate()
-        context = applicationContext
         nm = NotificationManagerCompat.from(this)
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         setListener(this)
@@ -647,7 +639,6 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         // if timeline changed, handle shuffle update in onTimelineChanged() instead
         // (onTimelineChanged() runs before both this callback and onShuffleModeEnabledChanged(),
         // which means shuffleFactory != null is not a valid check)
-        lyric()
         if (events.contains(EVENT_SHUFFLE_MODE_ENABLED_CHANGED) &&
             shuffleFactory == null && !events.contains(Player.EVENT_TIMELINE_CHANGED)) {
             // when enabling shuffle, re-shuffle lists so that the first index is up to date
@@ -687,7 +678,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         val runnable = object : Runnable {
             override fun run() {
                 lyric()
-                handler.postDelayed(this, 10)
+                handler.postDelayed(this, 100)
             }
         }
         handler.post(runnable) // 启动定时器
@@ -696,7 +687,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     fun lyric() {
         val getLyricsLegacy = controller?.getLyricsLegacy()
         val getLyrics = controller?.getLyrics()
-        updateLyricsLegacy(getLyricsLegacy, getLyrics)
+        updateLyrics(getLyricsLegacy, getLyrics)
         val highlightedLyric = getCurrentHighlightedLyric()
         if (highlightedLyric != null) {
             sendlyric(highlightedLyric)
@@ -707,50 +698,42 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     }
 
     private fun sendlyric(Lyrics: String) {
-        val lga by lazy { API() }
         if (highLyric != Lyrics ) {
             highLyric = Lyrics
             val isLyricUIEnabled = prefs.getBoolean("lyric_statusbarLyric", true)
-            val isLyricgetterapi = prefs.getBoolean("lyric_lyric_getter_api", true)
             if (isLyricUIEnabled == true ){
-                sendMeiZuStatusBarLyric(Lyrics)
-                if (isLyricgetterapi == true ){
-                    lga.sendLyric(Lyrics, extra = ExtraData().apply {
-                        packageName = "org.akanework.gramophone"
-                        customIcon = true
-                        base64Icon = Tools.drawableToBase64(getDrawable(R.drawable.ic_gramophone_monochrome)!!)
-                        useOwnMusicController = false
-                        delay = 0
-                    })
-                }
+                sendMeiZuStatusBarLyric(Lyrics,isLyricUIEnabled)
+            } else {
+                sendMeiZuStatusBarLyric("",isLyricUIEnabled)
             }
             //Log.d(TAG,"当前高亮歌词: $Lyrics")
 
         }
 
     }
-    private fun sendMeiZuStatusBarLyric(Lyrics: String) {
+    private fun sendMeiZuStatusBarLyric(Lyrics: String, open: Boolean) {
         val channelId = "StatusBarLyric"
-        val channelName = "MeiZuStatusBarLyric"
+        val channelName = getString(R.string.settings_lyrics_StatusBarLyric)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val importance = NotificationManager.IMPORTANCE_MIN // 设为低优先级，避免打扰用户
             val channel = NotificationChannel(channelId, channelName, importance)
-            channel.description = "魅族状态栏歌词"
+            channel.description = getString(R.string.settings_lyrics_StatusBarLyric)
 
-            val notificationManager = context.getSystemService(NotificationManager::class.java)
+            val notificationManager = applicationContext.getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
         }
-        val notification = NotificationCompat.Builder(context, channelId)
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
         notification.setSmallIcon(R.drawable.ic_gramophone_monochrome) // 确保图标存在且有效
-            .setContentTitle("魅族状态栏歌词")  // 通知标题，例如歌曲名称
+            .setContentTitle(getString(R.string.settings_lyrics_StatusBarLyric))  // 通知标题，例如歌曲名称
             .setContentText(Lyrics)  // 通知正文，例如歌手和专辑信息
             .setTicker(Lyrics)  // 设置状态栏歌词滚动内容
             .setPriority(NotificationCompat.PRIORITY_MIN)  // 低优先级，避免打扰
             .setOngoing(true)  // 设置为持续通知，用户无法轻易滑掉通知
         val StatusBar = notification.build()
-        // 设置自定义 FLAG，确保只更新状态栏歌词，不更新其他内容
+        //发送图标
         StatusBar.extras.putInt("ticker_icon", R.drawable.ic_gramophone_monochrome)
         StatusBar.extras.putBoolean("ticker_icon_switch", false)
+        // 设置自定义 FLAG，确保只更新状态栏歌词，不更新其他内容
         // 保持状态栏歌词滚动显示
         StatusBar.flags = StatusBar.flags.or(FLAG_ALWAYS_SHOW_TICKER)
         // 只更新 Ticker（歌词），不会更新其他属性
@@ -767,12 +750,20 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
                 Log.e("GramophoneService", "Notification permission not granted.")
                 return
             } else {
-                // 已经有权限，直接发送通知
-                notificationManager.notify(2, StatusBar)
+                // 已经有权限，直接发送通知,要是开关关闭则关闭通知
+                if (open == true ) {
+                    NotificationManagerCompat.from(applicationContext).notify(2, StatusBar)
+                } else {
+                    NotificationManagerCompat.from(applicationContext).cancel(2)
+                }
             }
         } else {
             // 低于 Android 13，不需要请求通知权限，直接发送通知
-            notificationManager.notify(2, StatusBar)
+            if (open == true ) {
+                NotificationManagerCompat.from(applicationContext).notify(2, StatusBar)
+            } else {
+                NotificationManagerCompat.from(applicationContext).cancel(2)
+            }
         }
     }
 
@@ -802,8 +793,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     }
 
 
-    fun updateLyricsLegacy(parsedLyrics: MutableList<MediaStoreUtils.Lyric>?, parsedLyricsa: SemanticLyrics?) {
-        lyrics = null
+    fun updateLyrics(parsedLyrics: MutableList<MediaStoreUtils.Lyric>?, parsedLyricsa: SemanticLyrics?) {
         if ( parsedLyrics.toString() == "null" ){
             lyricsLegacy = SemanticLyrics.convertForLegacy(parsedLyricsa)
             adapter?.updateLyrics(lyricsLegacy)
