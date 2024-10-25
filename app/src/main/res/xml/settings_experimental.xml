@@ -58,17 +58,6 @@
             android:widgetLayout="@layout/preference_switch_widget"
             app:iconSpaceReserved="false" />
 
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="lyric_statusbarLyric"
-            android:layout="@layout/preference_switch"
-            android:title="@string/settings_lyrics_StatusBarLyric"
-            android:summary="@string/settings_lyrics_StatusBarLyric_summary"
-            android:widgetLayout="@layout/preference_switch_widget"
-            app:iconSpaceReserved="false" />
-
-
     </PreferenceCategory>
-
 
 </PreferenceScreen>

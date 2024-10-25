@@ -5,7 +5,6 @@
     <uses-feature android:name="android.hardware.faketouch" android:required="false"/>
 
     <!-- Read music files (Android 13 and later) (includes .lrc and thumbnails) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"
         android:minSdkVersion="33" />
     <!-- Read cover files, this is never requested by UI but exists for users who want it -->
