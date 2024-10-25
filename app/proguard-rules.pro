@@ -27,9 +27,7 @@
 
 # reflection by androidx via theme attr viewInflaterClass
 -keep class org.akanework.gramophone.logic.ui.ViewCompatInflater { *; }
--keep class cn.lyric.getter.api.data.*{*;}
--keep class cn.lyric.getter.api.API{*;}
--keep class android.app.NotificationManager
+
 # get rid of spammy logging
 -assumenosideeffects class
                   android.util.Log {
