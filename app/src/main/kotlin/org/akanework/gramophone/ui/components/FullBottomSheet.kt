@@ -29,6 +29,7 @@ import androidx.core.graphics.TypefaceCompat
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.widget.TextViewCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -73,6 +74,7 @@ import org.akanework.gramophone.logic.GramophonePlaybackService
 import org.akanework.gramophone.logic.clone
 import org.akanework.gramophone.logic.dpToPx
 import org.akanework.gramophone.logic.fadInAnimation
+import org.akanework.gramophone.logic.getAudioFormat
 import org.akanework.gramophone.logic.getBooleanStrict
 import org.akanework.gramophone.logic.getFile
 import org.akanework.gramophone.logic.getIntStrict
@@ -90,6 +92,9 @@ import org.akanework.gramophone.logic.startAnimation
 import org.akanework.gramophone.logic.ui.MyRecyclerView
 import org.akanework.gramophone.logic.ui.placeholderScaleToFit
 import org.akanework.gramophone.logic.updateMargin
+import org.akanework.gramophone.logic.utils.AudioFormatDetector.Companion.AudioFormatInfo
+import org.akanework.gramophone.logic.utils.AudioFormatDetector.Companion.AudioQuality
+import org.akanework.gramophone.logic.utils.AudioFormatDetector.Companion.SpatialFormat
 import org.akanework.gramophone.logic.utils.CalculationUtils
 import org.akanework.gramophone.logic.utils.ColorUtils
 import org.akanework.gramophone.logic.utils.convertDurationToTimeStamp
@@ -181,6 +186,7 @@ class FullBottomSheet
     private val bottomSheetFullPreviousButton: MaterialButton
     private val bottomSheetFullDuration: TextView
     private val bottomSheetFullPosition: TextView
+    private var bottomSheetFullQualityDetails: TextView
     private val bottomSheetFullSlideUpButton: MaterialButton
     private val bottomSheetShuffleButton: MaterialButton
     private val bottomSheetLoopButton: MaterialButton
@@ -223,6 +229,7 @@ class FullBottomSheet
         bottomSheetPlaylistButton = findViewById(R.id.playlist)
         bottomSheetLyricButton = findViewById(R.id.lyrics)
         bottomSheetFullLyricView = findViewById(R.id.lyric_frame)
+        bottomSheetFullQualityDetails = findViewById(R.id.quality_details)
         fullPlayerFinalColor = MaterialColors.getColor(
             this,
             com.google.android.material.R.attr.colorSurface
@@ -276,6 +283,11 @@ class FullBottomSheet
                         val parsedLyrics = instance?.getLyricsLegacy()
                         bottomSheetFullLyricView.updateLyricsLegacy(parsedLyrics)
                     }
+                }
+
+                GramophonePlaybackService.SERVICE_GET_AUDIO_FORMAT -> {
+                    val format = instance?.getAudioFormat()
+                    updateQualityIndicators(format)
                 }
 
                 else -> {
@@ -644,6 +656,51 @@ class FullBottomSheet
         }
     }
 
+    private fun updateQualityIndicators(info: AudioFormatInfo?) {
+        if (info == null) {
+            bottomSheetFullQualityDetails.visibility = View.GONE
+            return
+        }
+        bottomSheetFullQualityDetails.visibility = View.VISIBLE
+
+        val icon = when (info.spatialFormat) {
+            SpatialFormat.SURROUND_5_0,
+            SpatialFormat.SURROUND_5_1,
+            SpatialFormat.SURROUND_6_1,
+            SpatialFormat.SURROUND_7_1 -> R.drawable.ic_surround_sound
+
+            SpatialFormat.DOLBY_ATMOS,
+            SpatialFormat.DOLBY_AC3,
+            SpatialFormat.DOLBY_AC4,
+            SpatialFormat.DOLBY_EAC3,
+            SpatialFormat.DOLBY_EAC3_JOC -> R.drawable.ic_dolby
+
+            else -> when (info.quality) {
+                AudioQuality.HIRES -> R.drawable.ic_high_res
+                AudioQuality.HD -> R.drawable.ic_hd
+                AudioQuality.CD -> R.drawable.ic_cd
+                AudioQuality.LOSSY -> R.drawable.ic_lossy
+                else -> null
+            }
+        }
+
+        val drawable = icon?.let { iconRes ->
+            AppCompatResources.getDrawable(context, iconRes)?.apply {
+                setBounds(0, 0, 18.dpToPx(context), 18.dpToPx(context))
+            }
+        }
+        bottomSheetFullQualityDetails.setCompoundDrawablesRelative(drawable, null, null, null)
+
+        bottomSheetFullQualityDetails.text = buildString {
+            append("${info.bitDepth}bit")
+            append(" / ${info.sampleRate / 1000f}kHz")
+            append(" / ${info.channelCount} ch")
+            info.bitrate?.let {
+                append(" / ${it / 1000}kbps")
+            }
+        }
+    }
+
     private suspend fun applyColorScheme() {
         val ctx = wrappedContext ?: context
 
@@ -816,6 +873,13 @@ class FullBottomSheet
                 colorOnSurface
             )
             bottomSheetFullSubtitle.setTextColor(
+                colorOnSurfaceVariant
+            )
+            TextViewCompat.setCompoundDrawableTintList(
+                bottomSheetFullQualityDetails,
+                ColorStateList.valueOf(colorOnSurfaceVariant)
+            )
+            bottomSheetFullQualityDetails.setTextColor(
                 colorOnSurfaceVariant
             )
             bottomSheetFullCoverFrame.setCardBackgroundColor(

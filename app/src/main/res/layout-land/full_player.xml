@@ -176,6 +176,20 @@
 				android:fontFamily="sans-serif" />
 
 			<TextView
+				android:id="@+id/quality_details"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center"
+				android:drawablePadding="4dp"
+				android:fontFamily="sans-serif"
+				android:gravity="center_vertical"
+				android:textColor="?attr/colorOnSurfaceVariant"
+				android:textSize="12sp"
+				app:textFontWeight="600"
+				tools:drawableStartCompat="@drawable/ic_high_res"
+				tools:text="16-bit / 44.1KHz / 2ch" />
+
+			<TextView
 				android:id="@+id/duration"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"

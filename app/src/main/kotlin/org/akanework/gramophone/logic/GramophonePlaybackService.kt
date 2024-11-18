@@ -81,6 +81,8 @@ import kotlinx.coroutines.sync.Semaphore
 import org.akanework.gramophone.BuildConfig
 import org.akanework.gramophone.R
 import org.akanework.gramophone.logic.ui.MeiZuLyricsMediaNotificationProvider
+import org.akanework.gramophone.logic.utils.AudioFormatDetector
+import org.akanework.gramophone.logic.utils.AudioFormatDetector.Companion.AudioFormatInfo
 import org.akanework.gramophone.logic.utils.CircularShuffleOrder
 import org.akanework.gramophone.logic.utils.LastPlayedManager
 import org.akanework.gramophone.logic.utils.LrcUtils.LrcParserOptions
@@ -119,6 +121,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         private const val PLAYBACK_REPEAT_ONE = "repeat_one"
         const val SERVICE_SET_TIMER = "set_timer"
         const val SERVICE_QUERY_TIMER = "query_timer"
+        const val SERVICE_GET_AUDIO_FORMAT = "get_audio_format"
         const val SERVICE_GET_LYRICS = "get_lyrics"
         const val SERVICE_GET_LYRICS_LEGACY = "get_lyrics_legacy"
         const val SERVICE_GET_SESSION = "get_session"
@@ -132,6 +135,8 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         private set
     private val sendLyrics = Runnable { scheduleSendingLyrics(false) }
     var lyrics: SemanticLyrics? = null
+        private set
+    var audioFormat: AudioFormatInfo? = null
         private set
     var lyricsLegacy: MutableList<MediaStoreUtils.Lyric>? = null
         private set
@@ -448,13 +453,22 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         availableSessionCommands.add(SessionCommand(SERVICE_QUERY_TIMER, Bundle.EMPTY))
         availableSessionCommands.add(SessionCommand(SERVICE_GET_LYRICS, Bundle.EMPTY))
         availableSessionCommands.add(SessionCommand(SERVICE_GET_LYRICS_LEGACY, Bundle.EMPTY))
+        availableSessionCommands.add(SessionCommand(SERVICE_GET_AUDIO_FORMAT, Bundle.EMPTY))
+
         handler.post {
             session.sendCustomCommand(
                 controller,
                 SessionCommand(SERVICE_GET_LYRICS, Bundle.EMPTY),
                 Bundle.EMPTY
             )
+
+            session.sendCustomCommand(
+                controller,
+                SessionCommand(SERVICE_GET_AUDIO_FORMAT, Bundle.EMPTY),
+                Bundle.EMPTY
+            )
         }
+
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
             .setAvailableSessionCommands(availableSessionCommands.build())
             .build()
@@ -518,6 +532,12 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
                     timerDuration?.let { td ->
                         it.extras.putInt("duration", (td - System.currentTimeMillis()).toInt())
                     }
+                }
+            }
+
+            SERVICE_GET_AUDIO_FORMAT -> {
+                SessionResult(SessionResult.RESULT_SUCCESS).also {
+                    it.extras.putParcelable("audio_format", audioFormat)
                 }
             }
 
@@ -588,6 +608,15 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
 
     override fun onTracksChanged(tracks: Tracks) {
         val mediaItem = controller!!.currentMediaItem
+
+        AudioFormatDetector.detectAudioFormat(tracks, controller).let { info ->
+            audioFormat = info
+            mediaSession?.broadcastCustomCommand(
+                SessionCommand(SERVICE_GET_AUDIO_FORMAT, Bundle.EMPTY),
+                Bundle.EMPTY
+            )
+        }
+
         lyricsLock.runInBg {
             val trim = prefs.getBoolean("trim_lyrics", true)
             val multiLine = prefs.getBoolean("lyric_multiline", false)

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M480 600q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35zm198 78q40-40 61-91t21-107q0-56-21-107t-61-91l-56 56q29 29 43.5 65.5T680 480q0 40-14.5 76.5T622 622l56 56zm-396 0l56-56q-29-29-43.5-65.5T280 480q0-40 14.5-76.5T338 338l-56-56q-40 40-61 91t-21 107q0 56 21 107t61 91zM160 800q-33 0-56.5-23.5T80 720V240q0-33 23.5-56.5T160 160h640q33 0 56.5 23.5T880 240v480q0 33-23.5 56.5T800 800H160z" />
+</vector>

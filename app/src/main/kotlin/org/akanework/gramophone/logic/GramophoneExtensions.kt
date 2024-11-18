@@ -68,11 +68,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import org.akanework.gramophone.BuildConfig
+import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_GET_AUDIO_FORMAT
 import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_GET_LYRICS
 import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_GET_LYRICS_LEGACY
 import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_GET_SESSION
 import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_QUERY_TIMER
 import org.akanework.gramophone.logic.GramophonePlaybackService.Companion.SERVICE_SET_TIMER
+import org.akanework.gramophone.logic.utils.AudioFormatDetector.Companion.AudioFormatInfo
 import org.akanework.gramophone.logic.utils.MediaStoreUtils
 import org.akanework.gramophone.logic.utils.SemanticLyrics
 import org.jetbrains.annotations.Contract
@@ -229,6 +231,14 @@ fun MediaController.getLyrics(): SemanticLyrics? =
         Bundle.EMPTY
     ).get().extras.let {
         BundleCompat.getParcelable<SemanticLyrics>(it, "lyrics", SemanticLyrics::class.java)
+    }
+
+fun MediaController.getAudioFormat(): AudioFormatInfo? =
+    sendCustomCommand(
+        SessionCommand(SERVICE_GET_AUDIO_FORMAT, Bundle.EMPTY),
+        Bundle.EMPTY
+    ).get().extras.let {
+        BundleCompat.getParcelable(it, "audio_format", AudioFormatInfo::class.java)
     }
 
 @OptIn(UnstableApi::class)
