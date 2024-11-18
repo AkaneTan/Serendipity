@@ -24,7 +24,7 @@ android {
     }
 
     namespace = "org.akanework.gramophone"
-    compileSdk = 34
+    compileSdk = 35
 
     signingConfigs {
         create("release") {
@@ -103,7 +103,7 @@ android {
         // That said, supporting Android 5.0 costs tolerable amounts of tech debt and we plan to
         // keep support for it for a while.
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 17
         versionName = "1.0.15"
         if (releaseType != "Release") {
@@ -254,6 +254,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-midi:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
+    implementation(files("../libs/lib-decoder-ffmpeg-release.aar"))
     //implementation("androidx.navigation:navigation-fragment-ktx:2.7.7") TODO consider it
     //implementation("androidx.paging:paging-runtime-ktx:3.2.1") TODO paged, partial, flow based library loading
     //implementation("androidx.paging:paging-guava:3.2.1") TODO do we have guava? do we need this?
