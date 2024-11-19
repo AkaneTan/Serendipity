@@ -170,6 +170,10 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
         timerDuration = null
     }
 
+    private val audioManager by lazy {
+        getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+
     private var timerDuration: Long? = null
         set(value) {
             field = value
@@ -609,7 +613,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     override fun onTracksChanged(tracks: Tracks) {
         val mediaItem = controller!!.currentMediaItem
 
-        AudioFormatDetector.detectAudioFormat(tracks, controller).let { info ->
+        AudioFormatDetector.detectAudioFormat(tracks, controller, audioManager).let { info ->
             audioFormat = info
             mediaSession?.broadcastCustomCommand(
                 SessionCommand(SERVICE_GET_AUDIO_FORMAT, Bundle.EMPTY),

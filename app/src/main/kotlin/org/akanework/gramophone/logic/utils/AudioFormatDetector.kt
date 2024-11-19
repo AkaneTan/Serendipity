@@ -1,5 +1,6 @@
 package org.akanework.gramophone.logic.utils
 
+import android.media.AudioManager
 import android.os.Parcelable
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -43,7 +44,9 @@ class AudioFormatDetector {
             val sampleRate: Int,
             val bitDepth: Int,
             val isLossless: Boolean,
-            val channelCount: Int,
+            val sourceChannels: Int,
+            val deviceChannels: Int,
+            val isDownMixing: Boolean,
             val bitrate: Int?,
             val mimeType: String?,
             val spatialFormat: SpatialFormat,
@@ -51,12 +54,16 @@ class AudioFormatDetector {
             val encoderDelay: Int?
         ) : Parcelable {
             override fun toString(): String {
+                val outputStr = if (isDownMixing) {
+                    "(Down mixed to $deviceChannels channels)"
+                } else ""
+
                 return """
                     Audio Format Details:
                     Quality Tier: $quality
                     Sample Rate: $sampleRate Hz
                     Bit Depth: $bitDepth bit
-                    Channel Count: $channelCount
+                    Source Channels: $sourceChannels $outputStr
                     Lossless: $isLossless
                     Spatial Format: $spatialFormat
                     Codec: $mimeType
@@ -66,7 +73,16 @@ class AudioFormatDetector {
         }
 
         @UnstableApi
-        fun detectAudioFormat(tracks: Tracks, player: Player?): AudioFormatInfo? {
+        fun detectAudioFormat(
+            tracks: Tracks,
+            player: Player?,
+            audioManager: AudioManager
+        ): AudioFormatInfo? {
+            // TODO: Consider using Media3/ExoPlayer APIs instead of AudioManager for getting device channel information
+            val activeDevice = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                .firstOrNull { device -> device.isSink }
+            val deviceChannels = activeDevice?.channelCounts?.maxOrNull() ?: 2
+
             for (group in tracks.groups) {
                 if (group.type == C.TRACK_TYPE_AUDIO) {
                     for (i in 0 until group.length) {
@@ -80,7 +96,9 @@ class AudioFormatDetector {
                         val bitDepth = detectBitDepth(format)
                         val isLossless = isLosslessFormat(format.sampleMimeType)
                         val spatialFormat = detectSpatialFormat(format)
-                        val channelCount = format.channelCount
+                        val sourceChannels = format.channelCount
+
+                        val isDownMixing = sourceChannels > deviceChannels
 
                         val quality = determineQualityTier(
                             sampleRate = sampleRate,
@@ -93,7 +111,9 @@ class AudioFormatDetector {
                             sampleRate = sampleRate,
                             bitDepth = bitDepth,
                             isLossless = isLossless,
-                            channelCount = channelCount,
+                            sourceChannels = sourceChannels,
+                            deviceChannels = deviceChannels,
+                            isDownMixing = isDownMixing,
                             bitrate = bitrate,
                             mimeType = format.sampleMimeType,
                             spatialFormat = spatialFormat,

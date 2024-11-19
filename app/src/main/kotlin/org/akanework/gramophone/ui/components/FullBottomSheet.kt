@@ -691,10 +691,16 @@ class FullBottomSheet
         }
         bottomSheetFullQualityDetails.setCompoundDrawablesRelative(drawable, null, null, null)
 
+        val channelInfo = if (info.isDownMixing) {
+            "${info.sourceChannels}ch ➝ ${info.deviceChannels}ch"
+        } else {
+            "${info.sourceChannels}ch"
+        }
+
         bottomSheetFullQualityDetails.text = buildString {
             append("${info.bitDepth}bit")
             append(" / ${info.sampleRate / 1000f}kHz")
-            append(" / ${info.channelCount} ch")
+            append(" / $channelInfo")
             info.bitrate?.let {
                 append(" / ${it / 1000}kbps")
             }
